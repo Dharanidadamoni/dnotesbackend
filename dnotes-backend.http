@@ -1,0 +1,6 @@
+@dnotes_backend_HostAddress = https://localhost:7027
+
+GET {{dnotes_backend_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
