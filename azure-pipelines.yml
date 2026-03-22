@@ -1,0 +1,70 @@
+trigger:
+- main
+
+variables:
+  buildConfiguration: 'Release'
+
+stages:
+
+# ✅ FIRST STAGE (NO dependsOn)
+- stage: Build
+  jobs:
+  - job: BuildJob
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: UseDotNet@2
+      inputs:
+        packageType: 'sdk'
+        version: '8.x'
+
+    - script: dotnet restore
+    - script: dotnet build --configuration $(buildConfiguration)
+    - script: dotnet publish -c $(buildConfiguration) -o $(Build.ArtifactStagingDirectory)
+
+    - publish: $(Build.ArtifactStagingDirectory)
+      artifact: drop
+
+
+# ✅ DEV STAGE
+- stage: Dev
+  dependsOn: Build
+  jobs:
+  - deployment: DeployDev
+    environment: 'dev'
+    pool:
+      vmImage: 'ubuntu-latest'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
+
+          - task: AzureWebApp@1
+            inputs:
+              azureSubscription: 'dnotesbe'
+              appName: 'deathnotes456'
+              package: '$(Pipeline.Workspace)/drop'
+
+
+# ✅ PROD STAGE
+- stage: Prod
+  dependsOn: Dev
+  jobs:
+  - deployment: DeployProd
+    environment: 'prod'
+    pool:
+      vmImage: 'ubuntu-latest'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
+
+          - task: AzureWebApp@1
+            inputs:
+              azureSubscription: 'dnotesbe'
+              appName: 'deathnotes456'
+              package: '$(Pipeline.Workspace)/drop'
