@@ -1,0 +1,74 @@
+# ASP.NET Core (.NET Framework)
+# Build and test ASP.NET Core projects targeting the full .NET Framework.
+# Add steps that publish symbols, save build artifacts, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
+
+trigger:
+- main
+
+variables:
+  buildConfiguration: 'Release'
+
+stages:
+
+# 🔹 BUILD STAGE
+- stage: Build
+  jobs:
+  - job: Build
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: UseDotNet@2
+      inputs:
+        packageType: 'sdk'
+        version: '8.x'
+
+    - script: dotnet restore
+    - script: dotnet build --configuration $(buildConfiguration)
+    - script: dotnet publish -c $(buildConfiguration) -o $(Build.ArtifactStagingDirectory)
+
+    - publish: $(Build.ArtifactStagingDirectory)
+      artifact: drop
+
+# 🔹 DEV DEPLOYMENT
+- stage: Dev
+  dependsOn: Build
+  jobs:
+  - deployment: DeployDev
+    environment: 'dev'
+    pool:
+      vmImage: 'ubuntu-latest'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
+
+          - task: AzureWebApp@1
+            inputs:
+              azureSubscription: 'YOUR-SERVICE-CONNECTION'
+              appName: 'dnotes-backend-dev'
+              package: '$(Pipeline.Workspace)/drop'
+
+# 🔹 PROD DEPLOYMENT
+- stage: Prod
+  dependsOn: Dev
+  condition: succeeded()
+  jobs:
+  - deployment: DeployProd
+    environment: 'prod'
+    pool:
+      vmImage: 'ubuntu-latest'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
+
+          - task: AzureWebApp@1
+            inputs:
+              azureSubscription: 'dnotes-service'
+              appName: 'deathnotes456'
+              package: '$(Pipeline.Workspace)/drop'
