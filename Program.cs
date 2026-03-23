@@ -14,9 +14,16 @@ var builder = WebApplication.CreateBuilder(args);
 // ══════════════════════════════════════════════════
 //  DATABASE
 // ══════════════════════════════════════════════════
+var conn = builder.Configuration.GetConnectionString("DefaultConnection");
+
+if (conn.Contains("localhost"))
+    Console.WriteLine("❌ Using LOCAL DB");
+else
+    Console.WriteLine("✅ Using AZURE DB");
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection"),
+
         sql => sql.EnableRetryOnFailure(3, TimeSpan.FromSeconds(5), null)
     )
 );
