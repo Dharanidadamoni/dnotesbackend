@@ -330,7 +330,8 @@ namespace dnotes_backend.Migrations
                     b.HasOne("dnotes_backend.Models.User", "Sender")
                         .WithMany("Messages")
                         .HasForeignKey("SenderId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete
+                        (DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Sender");

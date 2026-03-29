@@ -56,3 +56,21 @@ public class UserDto
     public bool IsTriggered { get; set; }
     public DateTime? SleepModeUntil { get; set; }
 }
+public class RegisterResponse
+{
+    public string MaskedEmail { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+}
+public class VerifyLoginOtpRequest
+{
+    [Required, EmailAddress]
+    public string Email { get; set; } = string.Empty;
+
+    [Required, StringLength(6, MinimumLength = 6)]
+    public string Otp { get; set; } = string.Empty;
+}
+public class SendLoginOtpRequest
+{
+    [Required, EmailAddress]
+    public string Email { get; set; } = string.Empty;
+}

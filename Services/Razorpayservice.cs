@@ -64,7 +64,7 @@ public class RazorpayService : IRazorpayService
         {
             { "amount",   amountInPaise },
             { "currency", "INR" },
-            { "receipt",  $"receipt_{recipientId}" },
+            { "receipt", $"rcpt_{recipientId.ToString("N").Substring(0, 20)}" }, 
             { "notes", new Dictionary<string, string>
                 {
                     { "recipientId", recipientId.ToString() },

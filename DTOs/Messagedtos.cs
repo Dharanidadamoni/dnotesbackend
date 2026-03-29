@@ -17,8 +17,7 @@ public class CreateMessageRequest
 
     public string DeliveryType { get; set; } = "immediate";
 
-    public string? EncryptedDeliveryDate { get; set; } // encrypted specific date
-
+    public string? DeliveryDate { get; set; }
     public bool IsDraft { get; set; } = true;
 
     public int WordCount { get; set; } = 0;
@@ -35,7 +34,7 @@ public class UpdateMessageRequest
 
     public string? DeliveryType { get; set; }
 
-    public string? EncryptedDeliveryDate { get; set; }
+    public string? DeliveryDate { get; set; }
 
     public bool? IsDraft { get; set; }
 
@@ -61,7 +60,7 @@ public class MessageDto
     public string Title { get; set; } = string.Empty;
     public string EncryptedBody { get; set; } = string.Empty;
     public string DeliveryType { get; set; } = string.Empty;
-    public string? EncryptedDeliveryDate { get; set; }
+    public string? DeliveryDate { get; set; }
     public bool IsDelivered { get; set; }
     public bool IsDraft { get; set; }
     public int WordCount { get; set; }

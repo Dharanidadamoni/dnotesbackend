@@ -3,18 +3,19 @@ using System.Security.Claims;
 using dnotes_backend.Data;
 using dnotes_backend.DTOs;
 using dnotes_backend.Helpers;
+using dnotes_backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace dnotes_backend.Controllers;
 
-// ── DTOs (inline for simplicity) ──────────────────
-public class UpdateProfileRequest
-{
-    [MaxLength(100)] public string? FirstName { get; set; }
-    [MaxLength(100)] public string? LastName { get; set; }
-}
+ //── DTOs(inline for simplicity) ──────────────────
+//public class UpdateProfileRequest
+//{
+//    [MaxLength(100)] public string? FirstName { get; set; }
+//    [MaxLength(100)] public string? LastName { get; set; }
+//}
 
 public class SleepModeRequest
 {
@@ -64,21 +65,89 @@ public class UsersController : ControllerBase
 
         return Ok(ApiResponse<UserDto>.Ok(dto));
     }
+    // POST /api/trigger/run-now   [DEV/ADMIN only]
+    // Manually fire the trigger check — for testing
+    [HttpPost("trigger/run-now")]
+    [Authorize]
+    public async Task<IActionResult> RunTriggerNow(
+        [FromServices] IServiceScopeFactory scopeFactory,
+        [FromServices] IEncryptionService enc,
+        [FromServices] IEmailService email,
+        [FromServices] AppDbContext db)
+    {
+        // Only allow in development!
+        //if (!_env.IsDevelopment())
+        //    return Forbid();
+
+        // Run the same logic as DeathTriggerService
+        var now = DateTime.UtcNow;
+
+        TimeZoneInfo ist;
+        try { ist = TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata"); }
+        catch { ist = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time"); }
+
+        var nowIst = TimeZoneInfo.ConvertTimeFromUtc(now, ist);
+        var today = nowIst.ToString("yyyy-MM-dd");
+
+        var messages = await db.Messages
+            .Include(m => m.Sender)
+            .Include(m => m.Recipients)
+            .Where(m =>
+                !m.IsDelivered &&
+                !m.IsDraft &&
+                m.DeliveryType == "specific" &&
+                m.EncryptedDeliveryDate != null)
+            .ToListAsync();
+
+        var triggered = new List<string>();
+
+        foreach (var msg in messages)
+        {
+            try
+            {
+                var date = enc.Decrypt(msg.EncryptedDeliveryDate!);
+                if (date == today)
+                {
+                    foreach (var r in msg.Recipients.Where(r => !r.IsNotified))
+                    {
+                        await email.SendDeathNotificationAsync(r, msg, msg.Sender);
+                        r.IsNotified = true;
+                        r.NotifiedAt = DateTime.UtcNow;
+                        triggered.Add(r.Email);
+                    }
+                    msg.IsDelivered = true;
+                    msg.DeliveredAt = DateTime.UtcNow;
+                }
+            }
+            catch { /* log */ }
+        }
+
+        await db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            success = true,
+            today,
+            //checked    = messages.Count,
+            triggered = triggered,
+            message = $"Triggered {triggered.Count} deliveries for today ({today})"
+        });
+    }
 
     // PUT /api/users/profile
-    [HttpPut("profile")]
-    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request)
-    {
-        var userId = GetUserId();
-        var user = await _db.Users.FindAsync(userId)
-            ?? throw new KeyNotFoundException("User not found.");
+    //[HttpPut("profile")]
+    //public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request)
+    //{
+    //    var userId = GetUserId();
+    //    var user = await _db.Users.FindAsync(userId)
+    //        ?? throw new KeyNotFoundException("User not found.");
 
-        if (request.FirstName != null) user.FirstName = request.FirstName.Trim();
-        if (request.LastName != null) user.LastName = request.LastName.Trim();
+    //    if (request.FirstName != null) user.FirstName = request.FirstName.Trim();
+    //    if (request.LastName != null) user.LastName = request.LastName.Trim();
 
-        await _db.SaveChangesAsync();
-        return Ok(ApiResponse.Ok("Profile updated."));
-    }
+    //    await _db.SaveChangesAsync();
+    //    return Ok(ApiResponse.Ok("Profile updated."));
+    //}
 
     // POST /api/users/checkin
     // Resets the death trigger timer — user confirms they're alive

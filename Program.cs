@@ -4,6 +4,8 @@ using dnotes_backend.Data;
 using dnotes_backend.Helpers;
 using dnotes_backend.Middleware;
 using dnotes_backend.Services;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -30,35 +32,53 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // ══════════════════════════════════════════════════
 //  JWT AUTH
+
 // ══════════════════════════════════════════════════
 var jwtSection = builder.Configuration.GetSection("JwtSettings");
 var secretKey = jwtSection["SecretKey"]!;
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = GoogleDefaults.AuthenticationScheme;
+
+    // 🔥 THIS is where it belongs
+    options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+})
+.AddCookie() // 🔥 REQUIRED
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
     {
-        options.TokenValidationParameters = new TokenValidationParameters
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtSection["Issuer"],
+        ValidAudience = jwtSection["Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(secretKey)),
+        ClockSkew = TimeSpan.Zero
+    };
+
+    options.Events = new JwtBearerEvents
+    {
+        OnAuthenticationFailed = ctx =>
         {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtSection["Issuer"],
-            ValidAudience = jwtSection["Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(
-                                           Encoding.UTF8.GetBytes(secretKey)),
-            ClockSkew = TimeSpan.Zero
-        };
-        options.Events = new JwtBearerEvents
-        {
-            OnAuthenticationFailed = ctx =>
-            {
-                if (ctx.Exception is SecurityTokenExpiredException)
-                    ctx.Response.Headers.Append("Token-Expired", "true");
-                return Task.CompletedTask;
-            }
-        };
-    });
+            if (ctx.Exception is SecurityTokenExpiredException)
+                ctx.Response.Headers.Append("Token-Expired", "true");
+
+            return Task.CompletedTask;
+        }
+    };
+})
+.AddGoogle(options =>
+{
+    options.ClientId = builder.Configuration["Google:ClientId"]!;
+    options.ClientSecret = builder.Configuration["Google:ClientSecret"]!;
+    options.CallbackPath = "/api/auth/google/callback";
+});
+
 
 builder.Services.AddAuthorization();
 
@@ -76,15 +96,18 @@ builder.Services.AddCors(o => o.AddPolicy("Frontend", p =>
      .AllowCredentials()));
 
 // ══════════════════════════════════════════════════
-//  SERVICES — Dependency Injection
+//  SERVICES — Dependency Injection|
+builder.Services.AddScoped<IRazorpayService, RazorpayService>();
 // ══════════════════════════════════════════════════
+builder.Services.AddScoped<IOtpService, OtpService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IMessageService, MessageService>();
 builder.Services.AddScoped<IVerifierService, VerifierService>();
 //builder.Services.AddScoped<IStripeService, StripeService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
-//builder.Services.AddScoped<IEncryptionService, EncryptionService>();
+builder.Services.AddScoped<IEncryptionService, EncryptionService>();
 builder.Services.AddSingleton<IJwtHelper, JwtHelper>();
+builder.Services.AddScoped<ISmsService, SmsService>();
 
 // Background service — runs daily death trigger check
 builder.Services.AddHostedService<DeathTriggerService>();

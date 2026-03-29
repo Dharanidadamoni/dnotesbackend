@@ -16,10 +16,17 @@
     }
 
     public class MessageService : IMessageService
-    {
-        private readonly AppDbContext _db;
+{
+    private readonly AppDbContext _db;
+    private readonly IEncryptionService _enc;
 
-        public MessageService(AppDbContext db) => _db = db;
+    public MessageService(AppDbContext db, IEncryptionService enc)
+    {
+        _db = db;
+        _enc = enc;
+    }
+
+    public MessageService(AppDbContext db) => _db = db;
 
         // ── CREATE ────────────────────────────────────
         public async Task<MessageDto> CreateAsync(Guid userId, CreateMessageRequest req)
@@ -30,7 +37,9 @@
                 Title = req.Title.Trim(),
                 EncryptedBody = req.EncryptedBody,
                 DeliveryType = req.DeliveryType,
-                EncryptedDeliveryDate = req.EncryptedDeliveryDate,
+                EncryptedDeliveryDate = !string.IsNullOrEmpty(req.DeliveryDate)
+    ? _enc.Encrypt(req.DeliveryDate)
+    : null,
                 IsDraft = req.IsDraft,
                 WordCount = req.WordCount,
             };
@@ -62,8 +71,12 @@
             if (req.Title != null) message.Title = req.Title.Trim();
             if (req.EncryptedBody != null) message.EncryptedBody = req.EncryptedBody;
             if (req.DeliveryType != null) message.DeliveryType = req.DeliveryType;
-            if (req.EncryptedDeliveryDate != null) message.EncryptedDeliveryDate = req.EncryptedDeliveryDate;
-            if (req.IsDraft != null) message.IsDraft = req.IsDraft.Value;
+        ////if (req.EncryptedDeliveryDate != null) message.EncryptedDeliveryDate = req.EncryptedDeliveryDate;
+        if (req.DeliveryDate != null)
+        {
+            message.EncryptedDeliveryDate = _enc.Encrypt(req.DeliveryDate);
+        }
+        if (req.IsDraft != null) message.IsDraft = req.IsDraft.Value;
             if (req.WordCount != null) message.WordCount = req.WordCount.Value;
 
             await _db.SaveChangesAsync();
@@ -163,27 +176,32 @@
                 ?? throw new KeyNotFoundException("Message not found.");
         }
 
-        private static MessageDto MapToDto(Message m) => new()
+    private MessageDto MapToDto(Message m) => new()
+    {
+        Id = m.Id,
+        Title = m.Title,
+        EncryptedBody = m.EncryptedBody,
+        DeliveryType = m.DeliveryType,
+
+        DeliveryDate = !string.IsNullOrEmpty(m.EncryptedDeliveryDate)
+     ? _enc.Decrypt(m.EncryptedDeliveryDate)
+     : null,
+
+        IsDelivered = m.IsDelivered,
+        IsDraft = m.IsDraft,
+        WordCount = m.WordCount,
+        CreatedAt = m.CreatedAt,
+        UpdatedAt = m.UpdatedAt,
+
+        Recipients = m.Recipients.Select(r => new RecipientDto
         {
-            Id = m.Id,
-            Title = m.Title,
-            EncryptedBody = m.EncryptedBody,
-            DeliveryType = m.DeliveryType,
-            EncryptedDeliveryDate = m.EncryptedDeliveryDate,
-            IsDelivered = m.IsDelivered,
-            IsDraft = m.IsDraft,
-            WordCount = m.WordCount,
-            CreatedAt = m.CreatedAt,
-            UpdatedAt = m.UpdatedAt,
-            Recipients = m.Recipients.Select(r => new RecipientDto
-            {
-                Id = r.Id,
-                Email = r.Email,
-                Name = r.Name,
-                Relationship = r.Relationship,
-                IsUnlocked = r.IsUnlocked,
-                IsNotified = r.IsNotified,
-            }).ToList()
-        };
-    }
+            Id = r.Id,
+            Email = r.Email,
+            Name = r.Name,
+            Relationship = r.Relationship,
+            IsUnlocked = r.IsUnlocked,
+            IsNotified = r.IsNotified,
+        }).ToList()
+    };
+}
 
