@@ -166,7 +166,7 @@ public class DeathTriggerService : BackgroundService
     private async Task ProcessInactivityTriggerAsync(
         AppDbContext db, IEmailService emailService, DateTime now)
     {
-        var triggerCutoff = now.AddDays(-77); // 70 days + 7 grace
+        var triggerCutoff = now.AddMinutes(5); // 70 days + 7 grace
 
         var usersToTrigger = await db.Users
             .Include(u => u.Messages
@@ -334,7 +334,7 @@ public class DeathTriggerService : BackgroundService
         AppDbContext db, IEmailService emailService, DateTime now)
     {
         var coolingHours = int.Parse(
-            _config["AppSettings:TriggerCoolingHours"] ?? "48");
+            _config["AppSettings:TriggerCoolingHours"] ?? "1");
 
         var readyToTrigger = await db.Verifiers
             .Include(v => v.User)
@@ -345,7 +345,7 @@ public class DeathTriggerService : BackgroundService
                 v.HasReportedDeath &&
                 v.Status == VerifierStatus.DeathReported &&
                 v.DeathReportedAt != null &&
-                v.DeathReportedAt!.Value.AddHours(coolingHours) <= now &&
+                v.DeathReportedAt!.Value.AddMinutes(coolingHours) <= now &&
                 !v.User.IsTriggered)
             .ToListAsync();
 

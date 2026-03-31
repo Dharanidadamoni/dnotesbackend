@@ -22,6 +22,7 @@ public interface IEmailService
         Models.ManualPayment payment,
         Models.Recipient recipient,
         Models.User sender);
+    Task SendDeathReportedToSenderAsync(User user, Verifier verifier);
 }
 
 public class EmailService : IEmailService
@@ -514,6 +515,112 @@ public async Task SendAdminPaymentNotificationAsync(
         </div>";
 
         await SendAsync(recipientEmail, "", subject, body);
+    }
+    public async Task SendDeathReportedToSenderAsync(User user, Verifier verifier)
+    {
+        var cancelUrl = $"{_frontendUrl}/verifier/cancel";
+        var loginUrl = $"{_frontendUrl}/login";
+        var subject = "⚠️ Action required — your verifier has reported your passing";
+
+        var body = $@"
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset='utf-8'></head>
+    <body style='margin:0;padding:0;background:#F0F7FF;font-family:Arial,sans-serif'>
+      <div style='max-width:560px;margin:0 auto;padding:24px 16px'>
+ 
+        <!-- Header -->
+        <div style='background:linear-gradient(135deg,#1D4ED8,#3B82F6);
+                    padding:28px 32px;text-align:center;border-radius:16px 16px 0 0'>
+          <div style='font-size:22px;font-weight:700;color:#fff;margin-bottom:4px'>
+            DeathNote
+          </div>
+          <div style='font-size:13px;color:rgba(255,255,255,0.8)'>
+            Important — action required
+          </div>
+        </div>
+ 
+        <!-- Warning bar -->
+        <div style='background:#FEF3C7;border-left:4px solid #F59E0B;
+                    padding:14px 20px;font-size:13px;color:#92400E;font-weight:600'>
+          ⚠️ Your trusted verifier has reported your passing
+        </div>
+ 
+        <!-- Body -->
+        <div style='background:#ffffff;padding:32px 32px;
+                    border:1px solid #BFDBFE;border-top:none'>
+ 
+          <p style='font-size:15px;color:#1E3A5F;line-height:1.8;margin:0 0 16px'>
+            Dear {user.FirstName},
+          </p>
+ 
+          <p style='font-size:15px;color:#334155;line-height:1.8;margin:0 0 16px'>
+            <strong>{verifier.Name}</strong> ({verifier.Email}) —
+            your trusted verifier — has reported that you have passed away on DeathNote.
+          </p>
+ 
+          <!-- 48-hour notice box -->
+          <div style='background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;
+                      padding:18px 20px;margin:20px 0'>
+            <div style='font-size:14px;font-weight:700;color:#1D4ED8;margin-bottom:8px'>
+              ⏱ 48-hour safety period has started
+            </div>
+            <div style='font-size:13px;color:#3B5F8A;line-height:1.7'>
+              Your messages will <strong>NOT</strong> be delivered yet.
+              You have <strong>48 hours</strong> to cancel this if it was a mistake.
+              After 48 hours, all your messages will be delivered to your recipients.
+            </div>
+          </div>
+ 
+          <p style='font-size:15px;color:#334155;line-height:1.8;margin:0 0 24px'>
+            <strong>If you are alive</strong> — please click the button below
+            immediately to cancel this report and keep your messages safe.
+          </p>
+ 
+          <!-- Cancel button -->
+          <div style='text-align:center;margin:0 0 20px'>
+            <a href='{loginUrl}'
+               style='background:linear-gradient(135deg,#3B82F6,#1D4ED8);
+                      color:#ffffff;padding:16px 40px;
+                      border-radius:100px;text-decoration:none;
+                      font-size:16px;font-weight:700;display:inline-block'>
+              I am alive — Cancel this report
+            </a>
+          </div>
+ 
+          <div style='text-align:center;font-size:13px;color:#94A3B8;margin-bottom:24px'>
+            Log in to your account and click &quot;I&apos;m Alive&quot; on the dashboard.
+          </div>
+ 
+          <!-- Separator -->
+          <div style='border-top:1px solid #DBEAFE;margin:24px 0'></div>
+ 
+          <!-- What happens next -->
+          <div style='font-size:13px;color:#64748B;line-height:1.8'>
+            <strong style='color:#1E3A5F'>What happens if you don&apos;t cancel:</strong>
+            <ul style='margin:8px 0;padding-left:20px'>
+              <li>After 48 hours, all your saved messages will be sent</li>
+              <li>Recipients will receive a notification email with a payment link</li>
+              <li>They pay ₹399 to unlock and read your final message</li>
+            </ul>
+          </div>
+ 
+        </div>
+ 
+        <!-- Footer -->
+        <div style='background:#EFF6FF;padding:16px;text-align:center;
+                    border-radius:0 0 16px 16px;border:1px solid #BFDBFE;border-top:none'>
+          <p style='color:#94A3B8;font-size:12px;margin:0'>
+            DeathNote · This email was triggered by your trusted verifier.<br/>
+            If you believe this is an error, log in immediately and cancel.
+          </p>
+        </div>
+ 
+      </div>
+    </body>
+    </html>";
+
+        await SendAsync(user.Email, user.FullName, subject, body);
     }
 
     // ── PRIVATE SEND ──────────────────────────────────

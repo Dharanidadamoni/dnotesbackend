@@ -98,7 +98,7 @@ public class VerifierService : IVerifierService
 
         // Send final warning to sender email
         // (in case they're alive and want to cancel)
-        //await _email.SendCheckInWarningAsync(verifier.User);
+        await _email.SendDeathReportedToSenderAsync(verifier.User, verifier);
     }
 
     public async Task CancelDeathReportAsync(Guid userId)

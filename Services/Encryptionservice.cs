@@ -77,4 +77,5 @@ public class EncryptionService : IEncryptionService
 
     public bool IsEncrypted(string value) =>
         !string.IsNullOrEmpty(value) && value.StartsWith(Prefix);
+
 }
